@@ -129,7 +129,7 @@ async function registerCalcCommand(): Promise<void> {
     instance: '.*', // Match all instances
     channel: '.*', // Match all channels
     user: '.*', // Match all users
-    regex: '(calc|c) ', // Match calc or c - trailing whitespace intentional
+    regex: '^(calc|c)\\s+', // Match calc or c at start of line followed by whitespace
     platformPrefixAllowed: true,
     ratelimit: rateLimitConfig,
   };
