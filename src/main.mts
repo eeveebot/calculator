@@ -320,7 +320,7 @@ async function publishHelp(): Promise<void> {
   };
 
   try {
-    await nats.publish('_help.update', JSON.stringify(helpUpdate));
+    await nats.publish('help.update', JSON.stringify(helpUpdate));
     log.info('Published calculator help information', {
       producer: 'calculator',
     });
@@ -336,8 +336,8 @@ async function publishHelp(): Promise<void> {
 await publishHelp();
 
 // Subscribe to help update requests
-const helpUpdateRequestSub = nats.subscribe('_help.updateRequest', () => {
-  log.info('Received _help.updateRequest message', {
+const helpUpdateRequestSub = nats.subscribe('help.updateRequest', () => {
+  log.info('Received help.updateRequest message', {
     producer: 'calculator',
   });
   void publishHelp();
