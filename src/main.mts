@@ -11,6 +11,19 @@ import { evaluate } from 'mathjs';
 // Record module startup time for uptime tracking
 const moduleStartTime = Date.now();
 
+// Import metrics
+import { initializeSystemMetrics, setupHttpServer } from '@eeveebot/libeevee';
+import { recordCalcCommand, recordProcessingTime, recordCalcError } from './lib/metrics.mjs';
+
+// Initialize system metrics
+initializeSystemMetrics('calculator');
+
+// Setup HTTP server for metrics and health checks
+setupHttpServer({
+  port: process.env.HTTP_API_PORT || '9003',
+  serviceName: 'calculator'
+});
+
 const calcCommandUUID = 'b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e';
 const calcCommandDisplayName = 'calc';
 
@@ -155,6 +168,7 @@ await registerCalcCommand();
 const calcCommandSub = nats.subscribe(
   `command.execute.${calcCommandUUID}`,
   (subject, message) => {
+    const startTime = Date.now();
     try {
       const data = JSON.parse(message.string());
       log.info('Received command.execute for calc', {
@@ -183,6 +197,9 @@ const calcCommandSub = nats.subscribe(
 
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
+        
+        // Record successful command execution (even though it's an error response)
+        recordCalcCommand(data.platform, data.network, data.channel, 'success');
         return;
       }
 
@@ -203,6 +220,9 @@ const calcCommandSub = nats.subscribe(
 
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
+        
+        // Record successful command execution
+        recordCalcCommand(data.platform, data.network, data.channel, 'success');
       } catch (evalError) {
         // Handle evaluation errors
         const response = {
@@ -217,6 +237,10 @@ const calcCommandSub = nats.subscribe(
 
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
+        
+        // Record command execution with error
+        recordCalcCommand(data.platform, data.network, data.channel, 'eval_error');
+        recordCalcError('eval_error');
       }
     } catch (error) {
       log.error('Failed to parse message', {
@@ -224,6 +248,20 @@ const calcCommandSub = nats.subscribe(
         message: message.string(),
         error: error,
       });
+      
+      // Record failed command execution
+      if (typeof error === 'object' && error !== null && 'platform' in error && 'network' in error && 'channel' in error) {
+        // If we have the data, record with specific details
+        recordCalcCommand(error.platform, error.network, error.channel, 'parse_error');
+      } else {
+        // Otherwise record with unknown details
+        recordCalcCommand('unknown', 'unknown', 'unknown', 'parse_error');
+      }
+      recordCalcError('parse_error');
+    } finally {
+      // Record processing time
+      const duration = Date.now() - startTime;
+      recordProcessingTime(duration / 1000); // Convert to seconds
     }
   }
 );
