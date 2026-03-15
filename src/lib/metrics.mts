@@ -1,4 +1,10 @@
-import { Counter, Histogram, log, natsPublishCounter, natsSubscribeCounter } from '@eeveebot/libeevee';
+import {
+  Counter,
+  Histogram,
+  log,
+  natsPublishCounter,
+  natsSubscribeCounter,
+} from '@eeveebot/libeevee';
 
 // Calculator module specific metrics
 export const calcCommandCounter = new Counter({
@@ -21,7 +27,12 @@ export const calcErrorCounter = new Counter({
 });
 
 // Function to record command execution
-export function recordCalcCommand(platform: string, network: string, channel: string, result: string): void {
+export function recordCalcCommand(
+  platform: string,
+  network: string,
+  channel: string,
+  result: string
+): void {
   try {
     calcCommandCounter.inc({
       module: 'calculator',

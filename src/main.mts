@@ -12,8 +12,18 @@ import { evaluate } from 'mathjs';
 const moduleStartTime = Date.now();
 
 // Import metrics
-import { initializeSystemMetrics, setupHttpServer } from '@eeveebot/libeevee';
-import { recordCalcCommand, recordProcessingTime, recordCalcError, recordNatsPublish, recordNatsSubscribe } from './lib/metrics.mjs';
+import {
+  initializeSystemMetrics,
+  setupHttpServer,
+  register,
+} from '@eeveebot/libeevee';
+import {
+  recordCalcCommand,
+  recordProcessingTime,
+  recordCalcError,
+  recordNatsPublish,
+  recordNatsSubscribe,
+} from './lib/metrics.mjs';
 
 // Initialize system metrics
 initializeSystemMetrics('calculator');
@@ -21,7 +31,7 @@ initializeSystemMetrics('calculator');
 // Setup HTTP server for metrics and health checks
 setupHttpServer({
   port: process.env.HTTP_API_PORT || '9003',
-  serviceName: 'calculator'
+  serviceName: 'calculator',
 });
 
 const calcCommandUUID = 'b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e';
@@ -200,7 +210,7 @@ const calcCommandSub = nats.subscribe(
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
         recordNatsPublish(outgoingTopic, 'command_response');
-        
+
         // Record successful command execution (even though it's an error response)
         recordCalcCommand(data.platform, data.network, data.channel, 'success');
         return;
@@ -224,7 +234,7 @@ const calcCommandSub = nats.subscribe(
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
         recordNatsPublish(outgoingTopic, 'command_response');
-        
+
         // Record successful command execution
         recordCalcCommand(data.platform, data.network, data.channel, 'success');
       } catch (evalError) {
@@ -242,9 +252,14 @@ const calcCommandSub = nats.subscribe(
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
         recordNatsPublish(outgoingTopic, 'command_error_response');
-        
+
         // Record command execution with error
-        recordCalcCommand(data.platform, data.network, data.channel, 'eval_error');
+        recordCalcCommand(
+          data.platform,
+          data.network,
+          data.channel,
+          'eval_error'
+        );
         recordCalcError('eval_error');
       }
     } catch (error) {
@@ -253,11 +268,22 @@ const calcCommandSub = nats.subscribe(
         message: message.string(),
         error: error,
       });
-      
+
       // Record failed command execution
-      if (typeof error === 'object' && error !== null && 'platform' in error && 'network' in error && 'channel' in error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'platform' in error &&
+        'network' in error &&
+        'channel' in error
+      ) {
         // If we have the data, record with specific details
-        recordCalcCommand(error.platform, error.network, error.channel, 'parse_error');
+        recordCalcCommand(
+          error.platform,
+          error.network,
+          error.channel,
+          'parse_error'
+        );
       } else {
         // Otherwise record with unknown details
         recordCalcCommand('unknown', 'unknown', 'unknown', 'parse_error');
@@ -332,6 +358,63 @@ const statsUptimeSub = nats.subscribe('stats.uptime', (subject, message) => {
   }
 });
 natsSubscriptions.push(statsUptimeSub);
+
+// Subscribe to stats.emit.request messages and respond with full module stats
+const statsEmitRequestSub = nats.subscribe(
+  'stats.emit.request',
+  (subject, message) => {
+    recordNatsSubscribe(subject);
+    try {
+      const data = JSON.parse(message.string());
+      log.info('Received stats.emit.request', {
+        producer: 'calculator',
+        replyChannel: data.replyChannel,
+      });
+
+      // Calculate uptime in milliseconds
+      const uptime = Date.now() - moduleStartTime;
+
+      // Get all prom-client metrics
+      void register
+        .metrics()
+        .then((prometheusMetrics) => {
+          // Get memory usage information
+          const memoryUsage = process.memoryUsage();
+
+          // Send stats back via the ephemeral reply channel
+          const statsResponse = {
+            module: 'calculator',
+            stats: {
+              uptime_seconds: Math.floor(uptime / 1000),
+              uptime_formatted: `${Math.floor(uptime / 86400000)}d ${Math.floor((uptime % 86400000) / 3600000)}h ${Math.floor((uptime % 3600000) / 60000)}m ${Math.floor((uptime % 60000) / 1000)}s`,
+              memory_rss_mb: Math.round(memoryUsage.rss / (1024 * 1024)),
+              memory_heap_used_mb: Math.round(
+                memoryUsage.heapUsed / (1024 * 1024)
+              ),
+              prometheus_metrics: prometheusMetrics,
+            },
+          };
+
+          if (data.replyChannel) {
+            void nats.publish(data.replyChannel, JSON.stringify(statsResponse));
+            recordNatsPublish(data.replyChannel, 'stats_response');
+          }
+        })
+        .catch((error) => {
+          log.error('Failed to collect prometheus metrics', {
+            producer: 'calculator',
+            error: error,
+          });
+        });
+    } catch (error) {
+      log.error('Failed to process stats.emit.request', {
+        producer: 'calculator',
+        error: error,
+      });
+    }
+  }
+);
+natsSubscriptions.push(statsEmitRequestSub);
 
 // Help information for calculator commands
 const calculatorHelp = [
