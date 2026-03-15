@@ -1,4 +1,4 @@
-import { Counter, Histogram, log } from '@eeveebot/libeevee';
+import { Counter, Histogram, log, natsPublishCounter, natsSubscribeCounter } from '@eeveebot/libeevee';
 
 // Calculator module specific metrics
 export const calcCommandCounter = new Counter({
@@ -17,7 +17,7 @@ export const calcProcessingTime = new Histogram({
 export const calcErrorCounter = new Counter({
   name: 'calc_errors_total',
   help: 'Total number of calc errors encountered',
-  labelNames: ['module', 'error_type'],
+  labelNames: ['module', 'type'],
 });
 
 // Function to record command execution
@@ -55,10 +55,40 @@ export function recordCalcError(errorType: string): void {
   try {
     calcErrorCounter.inc({
       module: 'calculator',
-      error_type: errorType,
+      type: errorType,
     });
   } catch (error) {
     log.error('Failed to record calc error metric', {
+      producer: 'calculator-metrics',
+      error,
+    });
+  }
+}
+
+// Function to record NATS publish operations
+export function recordNatsPublish(subject: string, messageType: string): void {
+  try {
+    natsPublishCounter.inc({
+      module: 'calculator',
+      type: messageType,
+    });
+  } catch (error) {
+    log.error('Failed to record NATS publish metric', {
+      producer: 'calculator-metrics',
+      error,
+    });
+  }
+}
+
+// Function to record NATS subscribe operations
+export function recordNatsSubscribe(subject: string): void {
+  try {
+    natsSubscribeCounter.inc({
+      module: 'calculator',
+      subject: subject,
+    });
+  } catch (error) {
+    log.error('Failed to record NATS subscribe metric', {
       producer: 'calculator-metrics',
       error,
     });

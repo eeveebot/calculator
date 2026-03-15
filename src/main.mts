@@ -13,7 +13,7 @@ const moduleStartTime = Date.now();
 
 // Import metrics
 import { initializeSystemMetrics, setupHttpServer } from '@eeveebot/libeevee';
-import { recordCalcCommand, recordProcessingTime, recordCalcError } from './lib/metrics.mjs';
+import { recordCalcCommand, recordProcessingTime, recordCalcError, recordNatsPublish, recordNatsSubscribe } from './lib/metrics.mjs';
 
 // Initialize system metrics
 initializeSystemMetrics('calculator');
@@ -149,6 +149,7 @@ async function registerCalcCommand(): Promise<void> {
 
   try {
     await nats.publish('command.register', JSON.stringify(commandRegistration));
+    recordNatsPublish('command.register', 'command_registration');
     log.info('Registered calc command with router', {
       producer: 'calculator',
       ratelimit: rateLimitConfig,
@@ -168,6 +169,7 @@ await registerCalcCommand();
 const calcCommandSub = nats.subscribe(
   `command.execute.${calcCommandUUID}`,
   (subject, message) => {
+    recordNatsSubscribe(subject);
     const startTime = Date.now();
     try {
       const data = JSON.parse(message.string());
@@ -197,6 +199,7 @@ const calcCommandSub = nats.subscribe(
 
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
+        recordNatsPublish(outgoingTopic, 'command_response');
         
         // Record successful command execution (even though it's an error response)
         recordCalcCommand(data.platform, data.network, data.channel, 'success');
@@ -220,6 +223,7 @@ const calcCommandSub = nats.subscribe(
 
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
+        recordNatsPublish(outgoingTopic, 'command_response');
         
         // Record successful command execution
         recordCalcCommand(data.platform, data.network, data.channel, 'success');
@@ -237,6 +241,7 @@ const calcCommandSub = nats.subscribe(
 
         const outgoingTopic = `chat.message.outgoing.${data.platform}.${data.instance}.${data.channel}`;
         void nats.publish(outgoingTopic, JSON.stringify(response));
+        recordNatsPublish(outgoingTopic, 'command_error_response');
         
         // Record command execution with error
         recordCalcCommand(data.platform, data.network, data.channel, 'eval_error');
@@ -270,7 +275,8 @@ natsSubscriptions.push(calcCommandSub);
 // Subscribe to control messages for re-registering commands
 const controlSubRegisterCommandCalc = nats.subscribe(
   `control.registerCommands.${calcCommandDisplayName}`,
-  () => {
+  (subject) => {
+    recordNatsSubscribe(subject);
     log.info(
       `Received control.registerCommands.${calcCommandDisplayName} control message`,
       {
@@ -284,7 +290,8 @@ natsSubscriptions.push(controlSubRegisterCommandCalc);
 
 const controlSubRegisterCommandAll = nats.subscribe(
   'control.registerCommands',
-  () => {
+  (subject) => {
+    recordNatsSubscribe(subject);
     log.info('Received control.registerCommands control message', {
       producer: 'calculator',
     });
@@ -295,6 +302,7 @@ natsSubscriptions.push(controlSubRegisterCommandAll);
 
 // Subscribe to stats.uptime messages and respond with module uptime
 const statsUptimeSub = nats.subscribe('stats.uptime', (subject, message) => {
+  recordNatsSubscribe(subject);
   try {
     const data = JSON.parse(message.string());
     log.info('Received stats.uptime request', {
@@ -314,6 +322,7 @@ const statsUptimeSub = nats.subscribe('stats.uptime', (subject, message) => {
 
     if (data.replyChannel) {
       void nats.publish(data.replyChannel, JSON.stringify(uptimeResponse));
+      recordNatsPublish(data.replyChannel, 'uptime_response');
     }
   } catch (error) {
     log.error('Failed to process stats.uptime request', {
@@ -359,6 +368,7 @@ async function publishHelp(): Promise<void> {
 
   try {
     await nats.publish('help.update', JSON.stringify(helpUpdate));
+    recordNatsPublish('help.update', 'help_update');
     log.info('Published calculator help information', {
       producer: 'calculator',
     });
@@ -374,7 +384,8 @@ async function publishHelp(): Promise<void> {
 await publishHelp();
 
 // Subscribe to help update requests
-const helpUpdateRequestSub = nats.subscribe('help.updateRequest', () => {
+const helpUpdateRequestSub = nats.subscribe('help.updateRequest', (subject) => {
+  recordNatsSubscribe(subject);
   log.info('Received help.updateRequest message', {
     producer: 'calculator',
   });
