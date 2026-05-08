@@ -31,12 +31,7 @@ const metrics = createModuleMetrics('calculator');
 // Initialize system metrics
 initializeSystemMetrics('calculator');
 
-// Setup HTTP server for metrics and health checks
-setupHttpServer({
-  port: process.env.HTTP_API_PORT || '9003',
-  serviceName: 'calculator',
-  natsClients: natsClients,
-});
+
 
 const calcCommandUUID = 'b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e';
 const calcCommandDisplayName = 'calc';
@@ -47,6 +42,13 @@ interface CalculatorConfig {
 }
 
 const natsClients: InstanceType<typeof NatsClient>[] = [];
+
+// Setup HTTP server for metrics and health checks
+setupHttpServer({
+  port: process.env.HTTP_API_PORT || '9003',
+  serviceName: 'calculator',
+  natsClients: natsClients,
+});
 const natsSubscriptions: Array<Promise<string | boolean>> = [];
 
 // Load configuration at startup
