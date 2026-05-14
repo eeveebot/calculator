@@ -18,7 +18,8 @@ import {
   sendChatMessage,
   registerHelp,
   HelpEntry,
-  registerStatsHandlers
+  registerStatsHandlers,
+  NatsSubscriptionResult,
 } from '@eeveebot/libeevee';
 import { evaluate } from 'mathjs';
 
@@ -49,7 +50,7 @@ setupHttpServer({
   serviceName: 'calculator',
   natsClients: natsClients,
 });
-const natsSubscriptions: Array<Promise<string | boolean>> = [];
+const natsSubscriptions: Array<Promise<NatsSubscriptionResult>> = [];
 
 // Load configuration at startup
 const calculatorConfig = loadModuleConfig<CalculatorConfig>({});
