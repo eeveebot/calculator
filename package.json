@@ -1,6 +1,7 @@
 {
   "name": "@eeveebot/calculator",
-  "version": "1.4.7",
+  "version": "1.4.8",
+  "type": "module",
   "description": "the eevee calculator module",
   "keywords": [
     "eevee"
@@ -16,6 +17,7 @@
     "update-libraries": "npm install --save @eeveebot/libeevee@latest"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.1.0",
     "@types/node": "^18.19.130",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
@@ -27,11 +29,6 @@
   },
   "dependencies": {
     "@eeveebot/libeevee": "^4.2.2",
-    "@types/express": "^5.0.6",
-    "express": "^5.2.1",
-    "irc-framework": "^4.14.0",
-    "mathjs": "^15.1.1",
-    "nats": "^2.29.3",
-    "winston": "^3.19.0"
+    "mathjs": "^15.1.1"
   }
 }
