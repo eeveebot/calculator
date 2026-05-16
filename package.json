@@ -1,6 +1,6 @@
 {
   "name": "@eeveebot/calculator",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "type": "module",
   "description": "the eevee calculator module",
   "keywords": [
