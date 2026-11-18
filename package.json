@@ -28,7 +28,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@eeveebot/libeevee": "^4.3.0",
+    "@eeveebot/libeevee": "^4.4.0",
     "mathjs": "^15.1.1"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }
